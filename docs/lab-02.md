@@ -35,7 +35,7 @@ You'll meet each piece across the next labs.
 - **Node.js 20+** (prerequisite) — the runtime. *Why:* NestJS runs on Node.
 - **@nestjs/cli** (global) — scaffolding tool. *Why:* generates project + modules/controllers/services with correct boilerplate so you don't hand-write it.
 - **@nestjs/swagger** — OpenAPI/Swagger integration. *Why:* we set up the docs UI **now** so that from the very first run you have a `/docs` page (like ASP.NET's built-in Swagger). It auto-discovers routes, so the UI fills in as you add endpoints. Deep annotation comes later in Lab 24.
-- **nestjs-pino + pino-http + pino-pretty** — structured logger. *Why:* NestJS's built-in logger writes plain human-readable strings — fine for development but unusable in production where you need machine-readable JSON to filter, search and correlate logs. Pino writes async (non-blocking), structured JSON to stdout, and automatically logs every HTTP request/response. `pino-pretty` makes the output readable in your terminal during development.
+- **Nest Logger (built-in)** — no install needed, ships with `@nestjs/common`. *Why:* set up early so you have structured log output from the very first run and can instrument as you build. We use the built-in logger throughout this project; swapping to a production-grade alternative (e.g. Pino) is a straightforward drop-in later.
 
 ```bash
 node -v          # confirm 20+
@@ -161,78 +161,22 @@ controllers in later labs. (Lab 24 deepens this: tags, request/response schemas,
 > Want it to feel exactly like .NET? Use `SwaggerModule.setup('swagger', app, document)` →
 > `http://localhost:3000/swagger`.
 
-### 7. Set up structured logging with Pino
+### 7. Set up the built-in Logger
 
-NestJS's built-in logger prints plain text strings — fine for development but not queryable in production. We replace it with **Pino**: the fastest Node.js logger, writing non-blocking async JSON to stdout, with automatic HTTP request/response logging.
+NestJS ships a `Logger` class in `@nestjs/common` — no install needed. Set it up now so every service can emit structured log output from day one.
 
-Install the packages:
-
-```bash
-npm i nestjs-pino pino-http
-npm i -D pino-pretty    # dev-only: pretty-prints JSON in your terminal
-```
-
-Create `src/logger/app-logger.module.ts`:
-
-```typescript
-import { Module } from '@nestjs/common';
-import { LoggerModule } from 'nestjs-pino';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-
-@Module({
-  imports: [
-    LoggerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const isDev = config.get('NODE_ENV') !== 'production';
-        return {
-          pinoHttp: {
-            level: isDev ? 'debug' : 'info',
-            transport: isDev
-              ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
-              : undefined,                  // production: raw JSON to stdout
-            redact: ['req.headers.authorization', 'req.headers.cookie'],
-          },
-        };
-      },
-    }),
-  ],
-})
-export class AppLoggerModule {}
-```
-
-Import it in `src/app.module.ts`:
-
-```typescript
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { AppLoggerModule } from './logger/app-logger.module';
-
-@Module({
-  imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    AppLoggerModule,
-  ],
-  controllers: [AppController],
-  providers: [AppService],
-})
-export class AppModule {}
-```
-
-Update `src/main.ts` to hand bootstrap logs over to Pino as well (add `bufferLogs` and `useLogger`):
+Enable log levels in `src/main.ts` (add the `logger` option):
 
 ```typescript
 import { NestFactory } from '@nestjs/core';
-import { Logger } from 'nestjs-pino';
+import { Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
-  app.useLogger(app.get(Logger));   // replace Nest's default logger with Pino
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log', 'debug', 'verbose'], // all levels in dev
+  });
 
   const config = new DocumentBuilder()
     .setTitle('User Management API')
@@ -243,15 +187,12 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
   await app.listen(3000);
+  Logger.log('Application running on http://localhost:3000', 'Bootstrap');
 }
 bootstrap();
 ```
 
-> **Why `bufferLogs: true`?** Without it, NestJS uses its own logger for the brief window between `NestFactory.create()` and `useLogger()`. `bufferLogs` holds those early messages and replays them through Pino once it is registered, so every log line — including bootstrap — is structured JSON.
-
-Restart `npm run start:dev`. You should now see colorised, single-line log output in your terminal, and every HTTP request is logged automatically (method, URL, status code, response time).
-
-To use the logger inside a service or controller, inject it:
+To use the logger inside any service or controller, instantiate it with the class name as context:
 
 ```typescript
 import { Injectable, Logger } from '@nestjs/common';
@@ -266,6 +207,10 @@ export class AppService {
   }
 }
 ```
+
+The context label (`AppService`) appears in every log line so you can tell which class emitted the message. Use `logger.log()` for info, `logger.warn()` for warnings, `logger.error()` for errors.
+
+> **Tip:** In a later lab you can swap the built-in logger for a production-grade alternative (e.g. Pino with JSON output) by implementing `LoggerService` — the call sites stay the same.
 
 ### 8. Initialize Git
 
@@ -283,9 +228,9 @@ git commit -m "lab-02: bootstrap NestJS project"
 - [ ] `GET /` returns "Hello World!".
 - [ ] `GET /ping` returns your JSON object.
 - [ ] **Swagger UI loads at `http://localhost:3000/docs`** and shows the `/ping` route.
-- [ ] Terminal shows colorised Pino log lines; each HTTP request is logged automatically.
+- [ ] Terminal shows Nest log lines with context labels (e.g. `[Bootstrap]`, `[NestApplication]`).
 - [ ] You can explain what `main.ts` and `app.module.ts` each do, and that the Swagger path is whatever you pass to `SwaggerModule.setup()`.
-- [ ] You can explain why Pino is preferred over the built-in NestJS logger in production.
+- [ ] You can use `new Logger(ClassName.name)` inside any service to emit log messages.
 
 ---
 
@@ -293,7 +238,7 @@ git commit -m "lab-02: bootstrap NestJS project"
 
 ```bash
 git add .
-git commit -m "lab-02: bootstrap NestJS project with Swagger and Pino logger"
+git commit -m "lab-02: bootstrap NestJS project with Swagger and Logger"
 ```
 
 ---
