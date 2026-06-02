@@ -39,7 +39,7 @@ You should have installed:
 - **Node.js 20+** and npm
 - **Docker** + Docker Compose (for PostgreSQL and Redis)
 - A code editor (VS Code recommended) with the **REST Client** extension (or Postman)
-- A SQL GUI client: **DBeaver**, **TablePlus**, or **pgAdmin** (optional but very helpful)
+- A SQL GUI client: **Navicat Premium Lite 17** (optional but very helpful)
 
 ---
 
@@ -104,7 +104,7 @@ controller + service + entities together via **Dependency Injection**.
 You build toward this layout (it doesn't all exist on day one):
 
 ```
-user-management-api/
+LearnBackendNestJS/
 ├── docs/                      # the 30 labs (lab-01.md … lab-30.md)
 ├── src/
 │   ├── main.ts                # app bootstrap
@@ -180,22 +180,7 @@ npm run start:dev
 
 ---
 
-## 8. Git workflow
-
-```bash
-git init
-git add .
-git commit -m "chore: bootstrap learning project"
-
-# after each lab:
-git add .
-git commit -m "lab-01: database fundamentals refresher"
-git push     # to your own GitHub/GitLab repo
-```
-
----
-
-## 9. Labs index
+## 8. Labs index
 
 See [`docs/README.md`](docs/README.md) for the full list and learning map.
 
