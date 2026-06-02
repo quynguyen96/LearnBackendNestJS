@@ -182,7 +182,6 @@ This lab uses no app dependencies — only infrastructure:
 Open a terminal, `cd` into the project root (where `docker-compose.yml` lives), then run:
 
 ```bash
-cd "user-management-api"
 docker compose up -d postgres
 docker compose ps          # confirm the postgres container is healthy
 ```
